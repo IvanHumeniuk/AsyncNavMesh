@@ -47,5 +47,6 @@ public class AstarController : MonoBehaviour
                 Debug.Log(path.vectorPath[i]);
             }
         });
+
     }
 }
