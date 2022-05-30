@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
+using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.Experimental.AI;
@@ -81,14 +82,43 @@ namespace UnityNavigationResearch
 
                             var finalStatus = query.EndFindPath(out int pathLength);
                             var pathResult = query.GetPathResult(result);
-                            var straightPath = new NativeArray<NavMeshLocation>(pathLength, Allocator.Temp);
-                            var straightPathFlags = new NativeArray<StraightPathFlags>(pathLength, Allocator.Temp);
-                            var vertexSide = new NativeArray<float>(pathLength, Allocator.Temp);
+                            var straightPath = new NativeArray<NavMeshLocation>(pathLength, Allocator.TempJob);
+                            var straightPathFlags = new NativeArray<StraightPathFlags>(pathLength, Allocator.TempJob);
+                            var vertexSide = new NativeArray<float>(pathLength, Allocator.TempJob);
+                            var jobStatus = new NativeArray<PathQueryStatus>(1, Allocator.TempJob);
+                            var straightPathLength = new NativeArray<int>(1, Allocator.TempJob);
 
                             try
                             {
-                                int straightPathCount = 0;
-                                var pathStatus = PathUtils.FindStraightPath(query, start, end, result, pathLength, ref straightPath, ref straightPathFlags, ref vertexSide, ref straightPathCount, maxPathLength);
+                                 //int straightPathCount = 0;
+                                 //var pathStatus = PathUtils.FindStraightPath(query, start, end, result, pathLength, ref straightPath, ref straightPathFlags, ref vertexSide, ref straightPathCount, maxPathLength);
+
+                                StraightPathCalculationJob straightPathCalculation = new StraightPathCalculationJob()
+                                {
+                                    query = query,
+                                    startPos = start,
+                                    endPos = end,
+                                    path = result,
+                                    pathSize = pathLength,
+                                    straightPath = straightPath,
+                                    vertexSide = vertexSide,
+                                    maxStraightPath = maxPathLength,
+                                    straightPathFlags = straightPathFlags,
+                                    status = jobStatus,
+                                    straightPathLength = straightPathLength
+                                };
+
+                                //pathData = straightPathCalculation;
+                                //return true;
+
+                                JobHandle job = straightPathCalculation.Schedule(1, 1);
+                                job.Complete();
+                               
+                                int straightPathCount = straightPathCalculation.straightPathLength[0];
+                                PathQueryStatus pathStatus = straightPathCalculation.status[0];
+                                straightPath = straightPathCalculation.straightPath;
+                               
+
                                 if (pathStatus == PathQueryStatus.Success)
                                 {
                                     path = new Vector3[straightPathCount];
@@ -100,11 +130,13 @@ namespace UnityNavigationResearch
                                 }
 
                                 path = default;
-                                Debug.Log($"Nav query failed with the status: {status}");
+                                Debug.Log($"Nav query failed with the status: {status}  {pathStatus}  {pathLength}");
                                 return false;
                             }
                             finally
                             {
+                                jobStatus.Dispose();
+                                straightPathLength.Dispose();
                                 straightPath.Dispose();
                                 straightPathFlags.Dispose();
                                 vertexSide.Dispose();

@@ -4,31 +4,38 @@ using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.AI;
 
-public struct StraightPathCalculationJob : IJobParallelFor
+public struct CharacterPathDataContainer : IJobParallelFor
 {
-    [NativeDisableParallelForRestriction] public NavMeshQuery query;
+    public int characterID;
+
     public Vector3 startPos;
     public Vector3 endPos;
-    [NativeDisableParallelForRestriction] public NativeSlice<PolygonId> path;
     public int pathSize;
     public int maxStraightPath;
 
-    // return
-    [NativeDisableParallelForRestriction] public NativeArray<NavMeshLocation> straightPath;
+    [NativeDisableParallelForRestriction] public NavMeshQuery query;
+    [NativeDisableParallelForRestriction] public NativeSlice<PolygonId> path;
+
     [NativeDisableParallelForRestriction] public NativeArray<StraightPathFlags> straightPathFlags;
     [NativeDisableParallelForRestriction] public NativeArray<float> vertexSide;
+
+    // return
+    [NativeDisableParallelForRestriction] public NativeArray<NavMeshLocation> straightPath;
     [NativeDisableParallelForRestriction] public NativeArray<int> straightPathLength;
     [NativeDisableParallelForRestriction] public NativeArray<PathQueryStatus> status;
-    // 
-
     public void Execute(int index)
+    {
+        Calculate();
+    }
+
+    public void Calculate()
     {
         // check before execution of continue
         if (!query.IsValid(path[0]))
         {
             straightPath[0] = new NavMeshLocation(); // empty terminator
             status[0] = PathQueryStatus.Failure; // | PathQueryStatus.InvalidParam;
-            return;
+            Debug.Log($"{status[0]}"); return;
         }
 
         straightPath[0] = query.CreateLocation(startPos, path[0]);
@@ -63,7 +70,7 @@ public struct StraightPathCalculationJob : IJobParallelFor
                     if (!success)
                     {
                         status[0] = PathQueryStatus.Failure; // | PathQueryStatus.InvalidParam;
-                        return;
+                        Debug.Log($"{status}"); return;
                     }
 
                     vl = polyWorldToLocal.MultiplyPoint(vl);
@@ -83,7 +90,7 @@ public struct StraightPathCalculationJob : IJobParallelFor
                     var polyLocalToWorld = query.PolygonLocalToWorldMatrix(path[apexIndex]);
                     var termPos = polyLocalToWorld.MultiplyPoint(apex + left);
 
-                    n = RetracePortals(query, apexIndex, leftIndex, path, n, termPos, ref straightPath, ref straightPathFlags, maxStraightPath);
+                    n = PathUtils.RetracePortals(query, apexIndex, leftIndex, path, n, termPos, ref straightPath, ref straightPathFlags, maxStraightPath);
                     if (vertexSide.Length > 0)
                     {
                         vertexSide[n - 1] = -1;
@@ -95,7 +102,7 @@ public struct StraightPathCalculationJob : IJobParallelFor
                     {
                         straightPathLength[0] = n;
                         status[0] = PathQueryStatus.Success; // | PathQueryStatus.BufferTooSmall;
-                        return;
+                        Debug.Log($"{status}"); return;
                     }
 
                     apex = polyWorldToLocal.MultiplyPoint(termPos);
@@ -109,7 +116,7 @@ public struct StraightPathCalculationJob : IJobParallelFor
                     var polyLocalToWorld = query.PolygonLocalToWorldMatrix(path[apexIndex]);
                     var termPos = polyLocalToWorld.MultiplyPoint(apex + right);
 
-                    n = RetracePortals(query, apexIndex, rightIndex, path, n, termPos, ref straightPath, ref straightPathFlags, maxStraightPath);
+                    n = PathUtils.RetracePortals(query, apexIndex, rightIndex, path, n, termPos, ref straightPath, ref straightPathFlags, maxStraightPath);
                     if (vertexSide.Length > 0)
                     {
                         vertexSide[n - 1] = 1;
@@ -121,7 +128,7 @@ public struct StraightPathCalculationJob : IJobParallelFor
                     {
                         straightPathLength[0] = n;
                         status[0] = PathQueryStatus.Success; // | PathQueryStatus.BufferTooSmall;
-                        return;
+                        Debug.Log($"{status}"); return;
                     }
 
                     apex = polyWorldToLocal.MultiplyPoint(termPos);
@@ -150,7 +157,7 @@ public struct StraightPathCalculationJob : IJobParallelFor
         if (n > 0 && (straightPath[n - 1].position == endPos))
             n--;
 
-        n = RetracePortals(query, apexIndex, pathSize - 1, path, n, endPos, ref straightPath, ref straightPathFlags, maxStraightPath);
+        n = PathUtils.RetracePortals(query, apexIndex, pathSize - 1, path, n, endPos, ref straightPath, ref straightPathFlags, maxStraightPath);
         if (vertexSide.Length > 0)
         {
             vertexSide[n - 1] = 0;
@@ -160,7 +167,7 @@ public struct StraightPathCalculationJob : IJobParallelFor
         {
             straightPathLength[0] = n;
             status[0] = PathQueryStatus.Success; // | PathQueryStatus.BufferTooSmall;
-            return;
+            Debug.Log($"{status}"); return;
         }
 
         // Fix flag for final path point
@@ -168,36 +175,5 @@ public struct StraightPathCalculationJob : IJobParallelFor
 
         straightPathLength[0] = n;
         status[0] = PathQueryStatus.Success;
-    }
-
-    public static int RetracePortals(NavMeshQuery query, int startIndex, int endIndex
-        , NativeSlice<PolygonId> path, int n, Vector3 termPos
-        , ref NativeArray<NavMeshLocation> straightPath
-        , ref NativeArray<StraightPathFlags> straightPathFlags
-        , int maxStraightPath)
-    {
-        for (var k = startIndex; k < endIndex - 1; ++k)
-        {
-            var type1 = query.GetPolygonType(path[k]);
-            var type2 = query.GetPolygonType(path[k + 1]);
-            if (type1 != type2)
-            {
-                Vector3 l, r;
-                var status = query.GetPortalPoints(path[k], path[k + 1], out l, out r);
-
-                float3 cpa1, cpa2;
-                GeometryUtils.SegmentSegmentCPA(out cpa1, out cpa2, l, r, straightPath[n - 1].position, termPos);
-                straightPath[n] = query.CreateLocation(cpa1, path[k + 1]);
-
-                straightPathFlags[n] = (type2 == NavMeshPolyTypes.OffMeshConnection) ? StraightPathFlags.OffMeshConnection : 0;
-                if (++n == maxStraightPath)
-                {
-                    return maxStraightPath;
-                }
-            }
-        }
-        straightPath[n] = query.CreateLocation(termPos, path[endIndex]);
-        straightPathFlags[n] = query.GetPolygonType(path[endIndex]) == NavMeshPolyTypes.OffMeshConnection ? StraightPathFlags.OffMeshConnection : 0;
-        return ++n;
-    }
+    }	
 }

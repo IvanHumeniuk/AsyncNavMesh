@@ -346,5 +346,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   prefab: {fileID: 7964930515800362005, guid: 4ab1154e96b86cc42806be42dc7245fa, type: 3}
-  offset: {x: 0, y: 20, z: 0}
+  recalculationPathRate: 0
+  offset: {x: 110, y: 20, z: 110}
+  instancesPerXAxis: 2
+  instancesPerZAxis: 2
+  count: 5
+  spawnRate: 0.25
+  performSpawn: 0
   sceneDataControllers: []
