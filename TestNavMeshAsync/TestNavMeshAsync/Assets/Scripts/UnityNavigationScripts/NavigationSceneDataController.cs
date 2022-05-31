@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Collections;
@@ -17,7 +18,15 @@ public class NavigationSceneDataController : MonoBehaviour
     private float lastPathTime;
     public float findPathRate = 1;
 
-    [ContextMenu("init")]
+	public bool isReady;
+
+	private IEnumerator Start()
+	{
+		yield return null;
+		isReady = true;
+	}
+
+	[ContextMenu("init")]
     public void Initialize()
 	{
         players.Clear();
@@ -30,118 +39,173 @@ public class NavigationSceneDataController : MonoBehaviour
 
 	private void FixedUpdate()
 	{
+		if (isReady == false)
+			return;
+
         if (Time.time < lastPathTime + findPathRate)
             return; 
 
         lastPathTime = Time.time;
 
-		int maxPathLength = 100;
 		int playersCount = players.Count;
+
+		if (playersCount == 0)
+			return;
+
+		int maxPathLength = 100;
+		int chunksCount = Mathf.CeilToInt((float)playersCount / NavMeshQueryDataChunk.MaxCapacity);
+		//Debug.Log($"Chunks {chunksCount}");
+
+		NavMeshQueryDataChunk[] queryDataChunks = new NavMeshQueryDataChunk[chunksCount];
 
 		// Prepare caharacters data
 
-		NativeArray<int> charactersIDs = new NativeArray<int>(playersCount, Allocator.TempJob);
-		NativeArray<NavMeshQuery> queries = new NativeArray<NavMeshQuery>(playersCount, Allocator.TempJob);
-		NativeArray<Vector3> startPositions = new NativeArray<Vector3>(playersCount, Allocator.TempJob);
-		NativeArray<Vector3> endPositions = new NativeArray<Vector3>(playersCount, Allocator.TempJob);
-		NativeArray<int> pathSizes = new NativeArray<int>(playersCount, Allocator.TempJob);
-		
-		NativeArray<PolygonId> path = new NativeArray<PolygonId>(playersCount * maxPathLength, Allocator.TempJob);
+		//NativeArray<PolygonId> queryPathResult = new NativeArray<PolygonId>(100, Allocator.TempJob);
 
-		NativeArray<int> maxStraightPathes = new NativeArray<int>(1, Allocator.TempJob);
-		maxStraightPathes[0] = maxPathLength;
-
-		NativeArray<int> straightPathLength = new NativeArray<int>(playersCount, Allocator.TempJob); // do not fill
-		NativeArray<PathQueryStatus> statuses = new NativeArray<PathQueryStatus>(playersCount, Allocator.TempJob); // do not fill
-
-		NativeHashMap<int, CharacterPathDataContainer> characterPathDataContainers = new NativeHashMap<int, CharacterPathDataContainer>(playersCount, Allocator.TempJob);
-
-		NativeList<NavMeshLocation> straightPath = new NativeList<NavMeshLocation>(Allocator.TempJob);
-		NativeList<StraightPathFlags> straightPathFlags = new NativeList<StraightPathFlags>(Allocator.TempJob);
-		NativeList<float> vertexSide = new NativeList<float>(Allocator.TempJob);
-	
-		NavMeshQuery query;
-		int pathLength;
-		Vector3 start;
-		Vector3 finish;
-
-		NativeArray<PolygonId> queryPathResult = new NativeArray<PolygonId>(100, Allocator.TempJob);
-		int nativeListLength = 0;
+		int chunkIterator = 0;
 
 		for (int i = 0; i < playersCount; i++)
 		{
-			var queryStatus = players[i].GetNavigationQuerry(out query, out pathLength, out start, out finish);
+			var queryStatus = players[i].GetNavigationQuerry(out NavMeshQuery query, out int pathLength, out Vector3 start, out Vector3 finish);
 			if (queryStatus != PathQueryStatus.Success)
 			{
-				Debug.Log($"{gameObject.name}  {players[i].gameObject.name} FAILED {queryStatus}");
-				continue;
+				//Debug.Log($"{gameObject.name}  {players[i].gameObject.name} FAILED {queryStatus}");
+
+				// fill with empty data. Jobs watn it
+				queryDataChunks[chunkIterator].Add(new NavMeshQueryDataContainer()
+				{
+					characterID = -1,
+					query = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.TempJob, 1000),
+					startPos = default,
+					endPos = default,
+					queryPathResult = new NativeArray<PolygonId>(1, Allocator.TempJob),
+					pathLength = 0,
+					maxPathLength = default,
+					straightPathFlags = new NativeArray<StraightPathFlags>(1, Allocator.TempJob),
+					vertexSide = new NativeArray<float>(1, Allocator.TempJob),
+					straightPath = new NativeArray<NavMeshLocation>(1, Allocator.TempJob),
+					straightPathLength = new NativeArray<int>(1, Allocator.TempJob),
+					status = new NativeArray<PathQueryStatus>(1, Allocator.TempJob)
+				});
+			}
+			else
+			{
+				NativeArray<PolygonId> queryPathResult = new NativeArray<PolygonId>(100, Allocator.TempJob);
+				query.GetPathResult(queryPathResult);
+
+				//Debug.Log($"{chunkIterator}  {queryDataChunks[chunkIterator].Length} {NavMeshQueryDataChunk.MaxCapacity}");
+				queryDataChunks[chunkIterator].Add(new NavMeshQueryDataContainer()
+				{
+					characterID = players[i].id,
+					query = query,
+					startPos = start,
+					endPos = finish,
+					queryPathResult = queryPathResult,
+					pathLength = pathLength,
+					maxPathLength = maxPathLength,
+					straightPathFlags = new NativeArray<StraightPathFlags>(pathLength, Allocator.TempJob),
+					vertexSide = new NativeArray<float>(pathLength, Allocator.TempJob),
+					straightPath = new NativeArray<NavMeshLocation>(pathLength, Allocator.TempJob),
+					straightPathLength = new NativeArray<int>(1, Allocator.TempJob),
+					status = new NativeArray<PathQueryStatus>(1, Allocator.TempJob)
+				});
 			}
 
-			charactersIDs[i] = players[i].id;
-			queries[i] = query;
-			startPositions[i] = start;
-			endPositions[i] = finish;
-			pathSizes[i] = pathLength;
+			if (queryDataChunks[chunkIterator].Length >= NavMeshQueryDataChunk.MaxCapacity)
+				chunkIterator++;
+		}
 
-			query.GetPathResult(queryPathResult);
-
-			int queryResultIndex = 0;
-			for (int pathResultIndex = playersCount * i; pathResultIndex < maxPathLength; pathResultIndex++)
+		// fill not assigned chunk items with empty data
+		int emptyChunkItemsCount = chunksCount * NavMeshQueryDataChunk.MaxCapacity - playersCount;
+		for (int i = NavMeshQueryDataChunk.MaxCapacity - emptyChunkItemsCount; i < NavMeshQueryDataChunk.MaxCapacity; i++)
+		{
+			queryDataChunks[chunkIterator].Add(new NavMeshQueryDataContainer()
 			{
-				path[pathResultIndex] = queryPathResult[queryResultIndex];
-				queryResultIndex++;
-			}
-
-			characterPathDataContainers.Add(players[i].id, new CharacterPathDataContainer()
-			{
-				startIndex = nativeListLength,
-				length = pathLength
+				characterID = -1,
+				query = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.TempJob, 1000),
+				startPos = default,
+				endPos = default,
+				queryPathResult = new NativeArray<PolygonId>(1, Allocator.TempJob),
+				pathLength = 0,
+				maxPathLength = default,
+				straightPathFlags = new NativeArray<StraightPathFlags>(1, Allocator.TempJob),
+				vertexSide = new NativeArray<float>(1, Allocator.TempJob),
+				straightPath = new NativeArray<NavMeshLocation>(1, Allocator.TempJob),
+				straightPathLength = new NativeArray<int>(1, Allocator.TempJob),
+				status = new NativeArray<PathQueryStatus>(1, Allocator.TempJob)
 			});
-
-			straightPath.AddRange(new NativeArray<NavMeshLocation>(pathLength, Allocator.TempJob));
-			straightPathFlags.AddRange(new NativeArray<StraightPathFlags>(pathLength, Allocator.TempJob));
-			vertexSide.AddRange(new NativeArray<float>(pathLength, Allocator.TempJob));
-
-			nativeListLength += pathLength;
 		}
 
 		// JOB
-		SessionPathesCaclulationJob pathesCaclulationJob = new SessionPathesCaclulationJob()
+		SessionPathesCaclulationJob pathesCaclulationJob = new SessionPathesCaclulationJob();
+		for (int i = 0; i < chunksCount; i++)
 		{
-			charactersIDs = charactersIDs,
-			queries = queries,
-			startPositions = startPositions,
-			endPositions = endPositions,
-			path = path,
-			pathSizes = pathSizes,
-			maxStraightPathes = maxStraightPathes,
-			characterPathDataContainers = characterPathDataContainers,
-			straightPath = straightPath,
-			straightPathFlags = straightPathFlags,
-			vertexSide = vertexSide,
-			straightPathLength = straightPathLength,
-			statuses = statuses
-		};
+			switch (i)
+			{
+				case 0:
+					{
+						pathesCaclulationJob.chunk0 = queryDataChunks[0];
+						break;
+					}
+				case 1:
+					{
+						pathesCaclulationJob.chunk1 = queryDataChunks[1];
+						break;
+					}
+				case 2:
+					{
+						pathesCaclulationJob.chunk2 = queryDataChunks[2];
+						break;
+					}
+				case 3:
+					{
+						pathesCaclulationJob.chunk3 = queryDataChunks[3];
+						break;
+					}
+				default:
+					return;
+			}
+		}
 
-		JobHandle job = pathesCaclulationJob.Schedule(playersCount, batchCount);
+		JobHandle job = pathesCaclulationJob.Schedule();
 		job.Complete();
 		
 		// Handle job result
 
-		// Clear data
-		charactersIDs.Dispose();
-		queries.Dispose();
-		startPositions.Dispose();
-		endPositions.Dispose();
-		path.Dispose();
-		pathSizes.Dispose();
-		characterPathDataContainers.Dispose();
-		straightPath.Dispose();
-		straightPathFlags.Dispose();
-		vertexSide.Dispose();
-		straightPathLength.Dispose();
-		statuses.Dispose();
 
-		queryPathResult.Dispose();
+
+		// Clear data
+
+		for (int i = 0; i < chunksCount; i++)
+		{
+			for (int j = 0; j < queryDataChunks[i].Length; j++)
+			{
+				if(queryDataChunks[i][j].status[0] == PathQueryStatus.Success)
+				{
+					var path = queryDataChunks[i][j].straightPath;
+					players[j + i * j].UpdatePath(ref path, queryDataChunks[i][j].straightPathLength[0]);
+				}
+
+				queryDataChunks[i][j].query.Dispose();
+
+				if(queryDataChunks[i][j].straightPathFlags.IsCreated)
+					queryDataChunks[i][j].straightPathFlags.Dispose();
+				
+				if(queryDataChunks[i][j].queryPathResult.IsCreated)
+					queryDataChunks[i][j].queryPathResult.Dispose();
+
+				if(queryDataChunks[i][j].vertexSide.IsCreated)
+					queryDataChunks[i][j].vertexSide.Dispose();
+
+				if(queryDataChunks[i][j].straightPath.IsCreated)
+					queryDataChunks[i][j].straightPath.Dispose();
+
+				if(queryDataChunks[i][j].straightPathLength.IsCreated)
+					queryDataChunks[i][j].straightPathLength.Dispose();
+
+				if(queryDataChunks[i][j].status.IsCreated)
+					queryDataChunks[i][j].status.Dispose();
+			}
+		}
 	}
 }

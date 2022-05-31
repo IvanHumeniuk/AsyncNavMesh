@@ -35,12 +35,12 @@ namespace UnityNavigationResearch
 		void Start()
         {
             path = new Vector3[0];
-            query = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.Persistent, 1000);
+            //query = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.Persistent, 1000);
         }
 
 		private void OnDestroy()
 		{
-            query.Dispose();
+            //query.Dispose();
 		}
 
 		public void Initialize(int id, string name)
@@ -99,17 +99,28 @@ namespace UnityNavigationResearch
 
         public PathQueryStatus GetNavigationQuerry(out NavMeshQuery navMeshQuery, out int pathLength, out Vector3 startPosition, out Vector3 finishPosition)
 		{
+            navMeshQuery = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.TempJob, 1000);
+
             pathLength = 1;
-            navMeshQuery = query;
             startPosition = transform.position;
             finishPosition = target.position;
 
             int querryFindPatIterations = 1024;
           
-            var from = query.MapLocation(startPosition, Vector3.one, 0);
-            var to = query.MapLocation(finishPosition, Vector3.one, 0);
+            var from = navMeshQuery.MapLocation(startPosition, Vector3.one, 0);
+            var to = navMeshQuery.MapLocation(finishPosition, Vector3.one, 0);
+            var status = PathQueryStatus.Failure;
 
-            var status = query.BeginFindPath(from, to);
+            try
+            {
+                status = navMeshQuery.BeginFindPath(from, to);
+            }
+            catch(Exception e)
+			{
+                navMeshQuery.Dispose();
+                status = PathQueryStatus.Failure;
+                return status;
+            }
 
             for (int i = 0; i < querryFindPatIterations; i++)
 			{
@@ -117,16 +128,16 @@ namespace UnityNavigationResearch
                 {
                     case PathQueryStatus.InProgress:
                         {
-                            status = query.UpdateFindPath(querryFindPatIterations, out int currentIterations);
+                            status = navMeshQuery.UpdateFindPath(querryFindPatIterations, out int currentIterations);
                         }
                         break;
                     case PathQueryStatus.Success:
                         {
-                            status = query.EndFindPath(out pathLength);
+                            status = navMeshQuery.EndFindPath(out pathLength);
                             return status;
                         }
 					default:
-                        Debug.Log($"{gameObject.name} Nav query failed with the status: {status}");
+                        Debug.Log($"{gameObject.name} Nav navMeshQuery failed with the status: {status}");
                         break;
 				}
 			}

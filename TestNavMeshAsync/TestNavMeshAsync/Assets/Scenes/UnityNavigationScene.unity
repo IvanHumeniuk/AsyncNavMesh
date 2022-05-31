@@ -745,7 +745,10 @@ MonoBehaviour:
   offset: {x: 110, y: 20, z: 110}
   instancesPerXAxis: 5
   instancesPerZAxis: 5
-  count: 1
+  count: 100
   spawnRate: 0.02
   performSpawn: 0
+  variant2: 0
+  rate: 2
+  frameCounter: 0
   sceneDataControllers: []

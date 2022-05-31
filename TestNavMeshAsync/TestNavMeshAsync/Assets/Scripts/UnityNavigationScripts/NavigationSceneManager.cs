@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
+using UnityEngine.Experimental.AI;
 
 public class NavigationSceneManager : MonoBehaviour
 {
@@ -27,12 +28,22 @@ public class NavigationSceneManager : MonoBehaviour
     public bool performSpawn;
 
     private NativeArray<SessionPathesCaclulationJob> sessionPathDatas;
+    private NativeArray<float> result;
+
+    public bool variant2;
+
+    public int rate = 2;
+    public int frameCounter;
+    private JobHandle jobHandle;
+    private ClusterPathDataCalculationJob clusterPathData;
+
 
     [Space(10)]
     public List<NavigationSceneDataController> sceneDataControllers = new List<NavigationSceneDataController>();
 	private void Start()
 	{
-        performSpawn = true;
+        //performSpawn = true;
+        frameCounter = 0;
     }
 
 	// Update is called once per frame
@@ -43,7 +54,7 @@ public class NavigationSceneManager : MonoBehaviour
 
         if (performSpawn == false)
             return;
-
+      
         if (sceneDataControllers.Count >= count)
             return;
 
@@ -73,6 +84,58 @@ public class NavigationSceneManager : MonoBehaviour
         lastSpawnTime = Time.time;
     }
 
+
+   /* private void TestFrames()
+	{
+        frameCounter++;
+
+        if (variant2)
+        {
+            if (frameCounter % rate == 0)
+            {
+                result = new NativeArray<float>(1, Allocator.TempJob);
+
+                clusterPathData = new ClusterPathDataCalculationJob()
+                {
+                    x = Vector3.one,
+                    y = Vector3.forward,
+                    result = result
+                };
+
+                jobHandle = clusterPathData.Schedule(1, 1);
+            }
+            else
+            {
+                if (result.IsCreated == false)
+                    return;
+
+                jobHandle.Complete();
+
+                Debug.Log($"{clusterPathData.result[0]}");
+
+                result.Dispose();
+            }
+        }
+        else
+        {
+            result = new NativeArray<float>(1, Allocator.TempJob);
+
+            clusterPathData = new ClusterPathDataCalculationJob()
+            {
+                x = Vector3.one,
+                y = Vector3.forward,
+                result = result
+            };
+
+            jobHandle = clusterPathData.Schedule(1, 1);
+            jobHandle.Complete();
+
+            Debug.Log($"{clusterPathData.result[0]}");
+
+            result.Dispose();
+        }
+     }
+   */
     private void FixedUpdate()
     {
         /*if (Time.time < lastPathUpdateRate + recalculationPathRate)
