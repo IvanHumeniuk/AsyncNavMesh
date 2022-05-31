@@ -26,13 +26,17 @@ public class NavigationSceneManager : MonoBehaviour
     private float lastSpawnTime;
     public bool performSpawn;
 
-    private NativeArray<SessionPathDataContainer> sessionPathDatas;
+    private NativeArray<SessionPathesCaclulationJob> sessionPathDatas;
 
     [Space(10)]
     public List<NavigationSceneDataController> sceneDataControllers = new List<NavigationSceneDataController>();
+	private void Start()
+	{
+        performSpawn = true;
+    }
 
-    // Update is called once per frame
-    void Update()
+	// Update is called once per frame
+	void Update()
     {
         if (Input.GetKeyDown(KeyCode.Space))
             performSpawn = !performSpawn;

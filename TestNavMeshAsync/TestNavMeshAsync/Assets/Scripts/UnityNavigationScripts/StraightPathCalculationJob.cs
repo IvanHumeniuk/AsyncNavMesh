@@ -83,7 +83,7 @@ public struct StraightPathCalculationJob : IJobParallelFor
                     var polyLocalToWorld = query.PolygonLocalToWorldMatrix(path[apexIndex]);
                     var termPos = polyLocalToWorld.MultiplyPoint(apex + left);
 
-                    n = RetracePortals(query, apexIndex, leftIndex, path, n, termPos, ref straightPath, ref straightPathFlags, maxStraightPath);
+                    n = PathUtils.RetracePortals(query, apexIndex, leftIndex, path, n, termPos, ref straightPath, ref straightPathFlags, maxStraightPath);
                     if (vertexSide.Length > 0)
                     {
                         vertexSide[n - 1] = -1;
@@ -109,7 +109,7 @@ public struct StraightPathCalculationJob : IJobParallelFor
                     var polyLocalToWorld = query.PolygonLocalToWorldMatrix(path[apexIndex]);
                     var termPos = polyLocalToWorld.MultiplyPoint(apex + right);
 
-                    n = RetracePortals(query, apexIndex, rightIndex, path, n, termPos, ref straightPath, ref straightPathFlags, maxStraightPath);
+                    n = PathUtils.RetracePortals(query, apexIndex, rightIndex, path, n, termPos, ref straightPath, ref straightPathFlags, maxStraightPath);
                     if (vertexSide.Length > 0)
                     {
                         vertexSide[n - 1] = 1;
@@ -150,7 +150,9 @@ public struct StraightPathCalculationJob : IJobParallelFor
         if (n > 0 && (straightPath[n - 1].position == endPos))
             n--;
 
-        n = RetracePortals(query, apexIndex, pathSize - 1, path, n, endPos, ref straightPath, ref straightPathFlags, maxStraightPath);
+        if (n >= 1)
+            n = PathUtils.RetracePortals(query, apexIndex, pathSize - 1, path, n, endPos, ref straightPath, ref straightPathFlags, maxStraightPath);
+
         if (vertexSide.Length > 0)
         {
             vertexSide[n - 1] = 0;
@@ -170,34 +172,4 @@ public struct StraightPathCalculationJob : IJobParallelFor
         status[0] = PathQueryStatus.Success;
     }
 
-    public static int RetracePortals(NavMeshQuery query, int startIndex, int endIndex
-        , NativeSlice<PolygonId> path, int n, Vector3 termPos
-        , ref NativeArray<NavMeshLocation> straightPath
-        , ref NativeArray<StraightPathFlags> straightPathFlags
-        , int maxStraightPath)
-    {
-        for (var k = startIndex; k < endIndex - 1; ++k)
-        {
-            var type1 = query.GetPolygonType(path[k]);
-            var type2 = query.GetPolygonType(path[k + 1]);
-            if (type1 != type2)
-            {
-                Vector3 l, r;
-                var status = query.GetPortalPoints(path[k], path[k + 1], out l, out r);
-
-                float3 cpa1, cpa2;
-                GeometryUtils.SegmentSegmentCPA(out cpa1, out cpa2, l, r, straightPath[n - 1].position, termPos);
-                straightPath[n] = query.CreateLocation(cpa1, path[k + 1]);
-
-                straightPathFlags[n] = (type2 == NavMeshPolyTypes.OffMeshConnection) ? StraightPathFlags.OffMeshConnection : 0;
-                if (++n == maxStraightPath)
-                {
-                    return maxStraightPath;
-                }
-            }
-        }
-        straightPath[n] = query.CreateLocation(termPos, path[endIndex]);
-        straightPathFlags[n] = query.GetPolygonType(path[endIndex]) == NavMeshPolyTypes.OffMeshConnection ? StraightPathFlags.OffMeshConnection : 0;
-        return ++n;
-    }
 }

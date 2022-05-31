@@ -58,7 +58,6 @@ public class PathUtils
         Assert.IsTrue(n < maxStraightPath);
         Assert.IsTrue(startIndex <= endIndex);
 #endif
-
         for (var k = startIndex; k < endIndex - 1; ++k)
         {
             var type1 = query.GetPolygonType(path[k]);
@@ -77,14 +76,22 @@ public class PathUtils
                 straightPath[n] = query.CreateLocation(cpa1, path[k + 1]);
 
                 straightPathFlags[n] = (type2 == NavMeshPolyTypes.OffMeshConnection) ? StraightPathFlags.OffMeshConnection : 0;
+
                 if (++n == maxStraightPath)
                 {
                     return maxStraightPath;
                 }
             }
         }
+
+        if (n >= straightPath.Length)
+		{
+            n--;
+		}
+
         straightPath[n] = query.CreateLocation(termPos, path[endIndex]);
         straightPathFlags[n] = query.GetPolygonType(path[endIndex]) == NavMeshPolyTypes.OffMeshConnection ? StraightPathFlags.OffMeshConnection : 0;
+
         return ++n;
     }
 
@@ -228,10 +235,14 @@ public class PathUtils
 
         // Remove the the next to last if duplicate point - e.g. start and end positions are the same
         // (in which case we have get a single point)
-        if (n > 0 && (straightPath[n - 1].position == endPos))
+        if (n > 0 && (straightPath[n - 1].position - endPos).magnitude < 0.1f)
+        {
             n--;
+        }
 
-        n = RetracePortals(query, apexIndex, pathSize - 1, path, n, endPos, ref straightPath, ref straightPathFlags, maxStraightPath);
+        if(n >= 1)
+            n = RetracePortals(query, apexIndex, pathSize - 1, path, n, endPos, ref straightPath, ref straightPathFlags, maxStraightPath);
+
         if (vertexSide.Length > 0)
         {
             vertexSide[n - 1] = 0;
