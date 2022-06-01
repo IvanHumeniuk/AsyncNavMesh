@@ -26,25 +26,35 @@ namespace UnityNavigationResearch
         private int frameCounter;
         private NavMeshQuery query;
 
+        private NativeArray<PolygonId> result;
+        private NativeArray<PathQueryStatus> jobStatus;
+        private NativeArray<int> straightPathLength;
+
         private void Awake()
-		{
+        {
             isReady = false;
         }
 
-		// Start is called before the first frame update
-		void Start()
+        // Start is called before the first frame update
+        void Start()
         {
             path = new Vector3[0];
-            //query = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.Persistent, 1000);
+           /* query = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.Persistent, 1000);
+            result = new NativeArray<PolygonId>(100, Allocator.Persistent);
+            jobStatus = new NativeArray<PathQueryStatus>(1, Allocator.Persistent);
+            straightPathLength = new NativeArray<int>(1, Allocator.Persistent);*/
         }
 
-		private void OnDestroy()
-		{
-            //query.Dispose();
-		}
+        private void OnDestroy()
+        {
+         /*   query.Dispose();
+            result.Dispose();
+            jobStatus.Dispose();
+            straightPathLength.Dispose();*/
+        }
 
-		public void Initialize(int id, string name)
-		{
+        public void Initialize(int id, string name)
+        {
             this.id = id;
             isReady = true;
             transform.parent.gameObject.name = name;
@@ -53,7 +63,7 @@ namespace UnityNavigationResearch
 
 
         // Update is called once per frame
-        void Update()
+        void FixedUpdate()
         {
             if (isReady == false)
                 return;
@@ -61,7 +71,7 @@ namespace UnityNavigationResearch
             frameCounter++;
 
             if (frameCounter % 3 == 0)
-                transform.position += movementDirection * speed * Time.deltaTime; 
+                transform.position += movementDirection * speed * Time.fixedDeltaTime;
 
             if (Time.time < lastPathTime + findPathRate)
                 return;
@@ -70,11 +80,11 @@ namespace UnityNavigationResearch
 
             lastPathTime = Time.time;
 
-            CalculatePath();
+            //CalculatePath();
         }
 
-		private void OnDrawGizmos()
-		{
+        private void OnDrawGizmos()
+        {
             if (isReady == false)
                 return;
 
@@ -89,17 +99,18 @@ namespace UnityNavigationResearch
             }
         }
 
-		private void CalculatePath()
-		{
-            //if(TryFindPath(transform.position, target.position, 1, -1, out path))
-			{
+        private void CalculatePath()
+        {
+            if (TryFindPath(transform.position, target.position, 1, -1, out Vector3[] newPath))
+            {
+                path = newPath;
                 //Debug.Log($"SUCCESS");
-			}
+            }
         }
 
         public PathQueryStatus GetNavigationQuerry(NavMeshQuery navMeshQuery, out int pathLength, out Vector3 startPosition, out Vector3 finishPosition)
-		{
-           // navMeshQuery = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.TempJob, 1000);
+        {
+            // navMeshQuery = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.TempJob, 1000);
 
             pathLength = 1;
             startPosition = transform.position;
@@ -118,15 +129,15 @@ namespace UnityNavigationResearch
 
                 status = navMeshQuery.BeginFindPath(from, to);
             }
-            catch(Exception e)
-			{
+            catch (Exception e)
+            {
                 status = PathQueryStatus.Failure;
                 return status;
             }
 
             for (int i = 0; i < querryFindPatIterations; i++)
-			{
-				switch (status)
+            {
+                switch (status)
                 {
                     case PathQueryStatus.InProgress:
                         {
@@ -138,17 +149,17 @@ namespace UnityNavigationResearch
                             status = navMeshQuery.EndFindPath(out pathLength);
                             return status;
                         }
-					default:
-                        Debug.Log($"{gameObject.name} Nav navMeshQuery failed with the status: {status}");
+                    default:
+                        //Debug.Log($"{gameObject.name} Nav navMeshQuery failed with the status: {status}");
                         break;
-				}
-			}
+                }
+            }
 
             return status;
         }
 
         public void UpdatePath(ref NativeArray<NavMeshLocation> straightPath, int length)
-		{
+        {
             path = new Vector3[length];
             for (int i = 0; i < length; i++)
             {
@@ -160,98 +171,104 @@ namespace UnityNavigationResearch
         {
             const int maxPathLength = 100;
 
-            using (var result = new NativeArray<PolygonId>(100, Allocator.TempJob))
-            using (var query = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.TempJob, 1000))
+            NavMeshLocation from;
+            NavMeshLocation to;
+            PathQueryStatus status = PathQueryStatus.Failure;
+
+            try
             {
-                var from = query.MapLocation(start, Vector3.one, 0);
-                var to = query.MapLocation(end, Vector3.one, 0);
+                from = query.MapLocation(start, Vector3.one, 0);
+                to = query.MapLocation(end, Vector3.one, 0);
 
-                var status = query.BeginFindPath(from, to, areas);
-                int maxIterations = 1024;
+                status = query.BeginFindPath(from, to);
+            }
+            catch (Exception e)
+            {
+                status = PathQueryStatus.Failure;
+                path = default;
+                return false;
+            }
 
-                while (true)
+            int maxIterations = 1024;
+
+            while (true)
+            {
+                switch (status)
                 {
-                    switch (status)
-                    {
-                        case PathQueryStatus.InProgress:
-                            status = query.UpdateFindPath(maxIterations, out int currentIterations);
-                            break;
+                    case PathQueryStatus.InProgress:
+                        status = query.UpdateFindPath(maxIterations, out int currentIterations);
+                        break;
 
-                        case PathQueryStatus.Success:
+                    case PathQueryStatus.Success:
 
-                            var finalStatus = query.EndFindPath(out int pathLength);
-                            var pathResult = query.GetPathResult(result);
-                            var straightPath = new NativeArray<NavMeshLocation>(pathLength, Allocator.TempJob);
-                            var straightPathFlags = new NativeArray<StraightPathFlags>(pathLength, Allocator.TempJob);
-                            var vertexSide = new NativeArray<float>(pathLength, Allocator.TempJob);
-                            var jobStatus = new NativeArray<PathQueryStatus>(1, Allocator.TempJob);
-                            var straightPathLength = new NativeArray<int>(1, Allocator.TempJob);
-                            
-                            try
+                        var finalStatus = query.EndFindPath(out int pathLength);
+                        var pathResult = query.GetPathResult(result);
+                        var straightPath = new NativeArray<NavMeshLocation>(pathLength, Allocator.TempJob);
+                        var straightPathFlags = new NativeArray<StraightPathFlags>(pathLength, Allocator.TempJob);
+                        var vertexSide = new NativeArray<float>(pathLength, Allocator.TempJob);
+
+                        try
+                        {
+                            //int straightPathCount = 0;
+                            //var pathStatus = PathUtils.FindStraightPath(query, start, end, result, pathLength,
+                            //ref straightPath, ref straightPathFlags, ref vertexSide, ref straightPathCount, maxPathLength);
+
+                            StraightPathCalculationJob straightPathCalculation = new StraightPathCalculationJob()
                             {
-                                 //int straightPathCount = 0;
-                                 //var pathStatus = PathUtils.FindStraightPath(query, start, end, result, pathLength,
-                                 //ref straightPath, ref straightPathFlags, ref vertexSide, ref straightPathCount, maxPathLength);
+                                query = query,
+                                startPos = start,
+                                endPos = end,
+                                path = result,
+                                pathSize = pathLength,
+                                straightPath = straightPath,
+                                vertexSide = vertexSide,
+                                maxStraightPath = maxPathLength,
+                                straightPathFlags = straightPathFlags,
+                                status = jobStatus,
+                                straightPathLength = straightPathLength
+                            };
 
-                                StraightPathCalculationJob straightPathCalculation = new StraightPathCalculationJob()
+                            //pathData = straightPathCalculation;
+                            //return true;
+
+                            JobHandle job = straightPathCalculation.Schedule();
+                            job.Complete();
+
+                            int straightPathCount = straightPathCalculation.straightPathLength[0];
+                            PathQueryStatus pathStatus = straightPathCalculation.status[0];
+                            straightPath = straightPathCalculation.straightPath;
+
+
+                            if (pathStatus == PathQueryStatus.Success)
+                            {
+                                path = new Vector3[straightPathCount];
+                                for (int i = 0; i < straightPathCount; i++)
                                 {
-                                    query = query,
-                                    startPos = start,
-                                    endPos = end,
-                                    path = result,
-                                    pathSize = pathLength,
-                                    straightPath = straightPath,
-                                    vertexSide = vertexSide,
-                                    maxStraightPath = maxPathLength,
-                                    straightPathFlags = straightPathFlags,
-                                    status = jobStatus,
-                                    straightPathLength = straightPathLength
-                                };
-
-                                //pathData = straightPathCalculation;
-                                //return true;
-
-                                JobHandle job = straightPathCalculation.Schedule(1, 1);
-                                job.Complete();
-                                
-                                int straightPathCount = straightPathCalculation.straightPathLength[0];
-                                PathQueryStatus pathStatus = straightPathCalculation.status[0];
-                                straightPath = straightPathCalculation.straightPath;
-                               
-                                
-                                if (pathStatus == PathQueryStatus.Success)
-                                {
-                                    path = new Vector3[straightPathCount];
-                                    for (int i = 0; i < straightPathCount; i++)
-                                    {
-                                        path[i] = straightPath[i].position;
-                                    }
-                                    return true;
+                                    path[i] = straightPath[i].position;
                                 }
-
-                                path = default;
-                                Debug.Log($"{gameObject.name} Nav query failed with the status: {status}  {pathStatus}  {pathLength}");
-                                return false;
-                            }
-                            finally
-                            {
-                                jobStatus.Dispose();
-                                straightPathLength.Dispose();
-                                straightPath.Dispose();
-                                straightPathFlags.Dispose();
-                                vertexSide.Dispose();
+                                return true;
                             }
 
-                        case PathQueryStatus.Failure:
                             path = default;
-                            Debug.Log($"Nav query failed with the status: {status}");
+                            Debug.Log($"{gameObject.name} Nav query failed with the status: {status}  {pathStatus}  {pathLength}");
                             return false;
+                        }
+                        finally
+                        {
+                            straightPath.Dispose();
+                            straightPathFlags.Dispose();
+                            vertexSide.Dispose();
+                        }
 
-                        default:
-                            Debug.Log($"Nav query failed with the status: {status}");
-                            path = default;
-                            return false;
-                    }
+                    case PathQueryStatus.Failure:
+                        path = default;
+                        Debug.Log($"Nav query failed with the status: {status}");
+                        return false;
+
+                    default:
+                        Debug.Log($"Nav query failed with the status: {status}");
+                        path = default;
+                        return false;
                 }
             }
         }

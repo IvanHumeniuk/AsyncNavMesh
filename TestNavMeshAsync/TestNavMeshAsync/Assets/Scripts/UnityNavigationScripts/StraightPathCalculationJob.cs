@@ -1,10 +1,12 @@
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Experimental.AI;
 
-public struct StraightPathCalculationJob : IJobParallelFor
+[BurstCompile]
+public struct StraightPathCalculationJob : IJob
 {
     [NativeDisableParallelForRestriction] public NavMeshQuery query;
     public Vector3 startPos;
@@ -21,7 +23,7 @@ public struct StraightPathCalculationJob : IJobParallelFor
     [NativeDisableParallelForRestriction] public NativeArray<PathQueryStatus> status;
     // 
 
-    public void Execute(int index)
+    public void Execute()
     {
         // check before execution of continue
         if (!query.IsValid(path[0]))

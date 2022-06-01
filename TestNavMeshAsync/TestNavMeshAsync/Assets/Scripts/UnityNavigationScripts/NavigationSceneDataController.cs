@@ -65,8 +65,6 @@ public class NavigationSceneDataController : MonoBehaviour
 
 		// Prepare caharacters data
 
-		//NativeArray<PolygonId> queryPathResult = new NativeArray<PolygonId>(100, Allocator.TempJob);
-
 		int chunkIterator = 0;
 
 		for (int i = 0; i < playersCount; i++)
@@ -189,7 +187,7 @@ public class NavigationSceneDataController : MonoBehaviour
 			pathesCaclulationJob.Assign(i, ref queryDataChunks[i]);
 		}
 
-		JobHandle handle = pathesCaclulationJob.Schedule();
+		JobHandle handle = pathesCaclulationJob.Schedule(SessionPathesCaclulationJob.Capacity, SessionPathesCaclulationJob.Capacity);
 
 		for (int i = 1; i < jobsCount; i++)
 		{
@@ -202,7 +200,7 @@ public class NavigationSceneDataController : MonoBehaviour
 				pathCalculation.Assign(jobChunkIndex, ref queryDataChunks[queryChunkIndex]);
 			}
 
-			handle = pathCalculation.Schedule(handle);
+			handle = pathCalculation.Schedule(SessionPathesCaclulationJob.Capacity, SessionPathesCaclulationJob.Capacity, handle);
 		}
 
 		handle.Complete();

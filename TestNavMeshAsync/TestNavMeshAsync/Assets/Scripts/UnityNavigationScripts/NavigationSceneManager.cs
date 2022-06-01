@@ -4,9 +4,14 @@ using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Experimental.AI;
+using UnityEngine.UI;
 
 public class NavigationSceneManager : MonoBehaviour
 {
+    public TMPro.TMP_InputField mapCountInput;
+    public TMPro.TMP_InputField spawnRateInput;
+    public Toggle isSpawnToggle;
+
     public GameObject prefab;
 
     public float recalculationPathRate;
@@ -42,6 +47,7 @@ public class NavigationSceneManager : MonoBehaviour
     public List<NavigationSceneDataController> sceneDataControllers = new List<NavigationSceneDataController>();
 	private void Start()
 	{
+        Application.targetFrameRate = 200;
         //performSpawn = true;
         frameCounter = 0;
     }
@@ -49,14 +55,25 @@ public class NavigationSceneManager : MonoBehaviour
 	// Update is called once per frame
 	void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (performSpawn == false)
+        {
+            int.TryParse(mapCountInput.text, out count);
+            float.TryParse(spawnRateInput.text, out spawnRate);
+        }
+
+        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
             performSpawn = !performSpawn;
+      
+        isSpawnToggle.isOn = performSpawn;
 
         if (performSpawn == false)
             return;
-      
+
         if (sceneDataControllers.Count >= count)
+        {
+            performSpawn = false;
             return;
+		}
 
         if (Time.time < lastSpawnTime + spawnRate)
             return;

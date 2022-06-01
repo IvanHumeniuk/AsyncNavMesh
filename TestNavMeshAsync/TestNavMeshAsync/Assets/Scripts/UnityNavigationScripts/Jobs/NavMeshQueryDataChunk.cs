@@ -9,8 +9,8 @@ public struct NavMeshQueryDataChunk
     private NavMeshQueryDataContainer p2;
     private NavMeshQueryDataContainer p3;
     private NavMeshQueryDataContainer p4;
-   /* private NavMeshQueryDataContainer p5;
-    private NavMeshQueryDataContainer p6;
+    private NavMeshQueryDataContainer p5;
+    /*private NavMeshQueryDataContainer p6;
     private NavMeshQueryDataContainer p7;
     private NavMeshQueryDataContainer p8;
     private NavMeshQueryDataContainer p9;
@@ -41,7 +41,7 @@ public struct NavMeshQueryDataChunk
 
     public static int Capacity
     {
-        get { return 5; }
+        get { return 6; }
     }
 
     public NavMeshQueryDataContainer this[int index]
@@ -63,8 +63,8 @@ public struct NavMeshQueryDataChunk
             case 2: return p2;
             case 3: return p3;
             case 4: return p4;
-           /* case 5: return p5;
-            case 6: return p6;
+            case 5: return p5;
+            /*case 6: return p6;
             case 7: return p7;
             case 8: return p8;
             case 9: return p9;
@@ -104,8 +104,8 @@ public struct NavMeshQueryDataChunk
             case 2: p2 = elementValue; break;
             case 3: p3 = elementValue; break;
             case 4: p4 = elementValue; break;
-           /* case 5: p5 = elementValue; break;
-            case 6: p6 = elementValue; break;
+            case 5: p5 = elementValue; break;
+            /*case 6: p6 = elementValue; break;
             case 7: p7 = elementValue; break;
             case 8: p8 = elementValue; break;
             case 9: p9 = elementValue; break;

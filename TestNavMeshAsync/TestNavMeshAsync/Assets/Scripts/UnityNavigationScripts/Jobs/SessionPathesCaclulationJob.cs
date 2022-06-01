@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.Experimental.AI;
 
 [BurstCompile]
-public struct SessionPathesCaclulationJob : IJob
+public struct SessionPathesCaclulationJob : IJobParallelFor
 {
 	public static int Capacity { get { return 4; } }
 
@@ -47,9 +47,9 @@ public struct SessionPathesCaclulationJob : IJob
 		}
 	}
 
-	public void Execute()
+	public void Execute(int index)
 	{
-		for (int index = 0; index < 4; index++)
+		//for (int index = 0; index < 4; index++)
 		{
 			switch (index)
 			{
