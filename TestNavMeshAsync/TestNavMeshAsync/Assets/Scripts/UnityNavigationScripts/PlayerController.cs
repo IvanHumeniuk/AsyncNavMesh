@@ -97,27 +97,29 @@ namespace UnityNavigationResearch
 			}
         }
 
-        public PathQueryStatus GetNavigationQuerry(out NavMeshQuery navMeshQuery, out int pathLength, out Vector3 startPosition, out Vector3 finishPosition)
+        public PathQueryStatus GetNavigationQuerry(NavMeshQuery navMeshQuery, out int pathLength, out Vector3 startPosition, out Vector3 finishPosition)
 		{
-            navMeshQuery = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.TempJob, 1000);
+           // navMeshQuery = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.TempJob, 1000);
 
             pathLength = 1;
             startPosition = transform.position;
             finishPosition = target.position;
 
             int querryFindPatIterations = 1024;
-          
-            var from = navMeshQuery.MapLocation(startPosition, Vector3.one, 0);
-            var to = navMeshQuery.MapLocation(finishPosition, Vector3.one, 0);
-            var status = PathQueryStatus.Failure;
+
+            NavMeshLocation from;
+            NavMeshLocation to;
+            PathQueryStatus status = PathQueryStatus.Failure;
 
             try
             {
+                from = navMeshQuery.MapLocation(startPosition, Vector3.one, 0);
+                to = navMeshQuery.MapLocation(finishPosition, Vector3.one, 0);
+
                 status = navMeshQuery.BeginFindPath(from, to);
             }
             catch(Exception e)
 			{
-                navMeshQuery.Dispose();
                 status = PathQueryStatus.Failure;
                 return status;
             }

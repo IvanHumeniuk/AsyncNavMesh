@@ -8,11 +8,45 @@ using UnityEngine.Experimental.AI;
 [BurstCompile]
 public struct SessionPathesCaclulationJob : IJob
 {
+	public static int Capacity { get { return 4; } }
+
 	[NativeDisableParallelForRestriction] public NavMeshQueryDataChunk chunk0;
 	[NativeDisableParallelForRestriction] public NavMeshQueryDataChunk chunk1;
 	[NativeDisableParallelForRestriction] public NavMeshQueryDataChunk chunk2;
 	[NativeDisableParallelForRestriction] public NavMeshQueryDataChunk chunk3;
 	
+	public void Assign(int index, ref NavMeshQueryDataChunk chunk)
+	{
+		if (index < 0 || index >= Capacity)
+			return;
+
+		switch (index)
+		{
+			case 0:
+				{
+					chunk0 = chunk;
+					break;
+				}
+			case 1:
+				{
+					chunk1 = chunk;
+					break;
+				}
+			case 2:
+				{
+					chunk2 = chunk;
+					break;
+				}
+			case 3:
+				{
+					chunk3 = chunk;
+					break;
+				}
+			default:
+				return;
+		}
+	}
+
 	public void Execute()
 	{
 		for (int index = 0; index < 4; index++)

@@ -39,7 +39,7 @@ public struct NavMeshQueryDataChunk
 
     public int Length { get; private set; }
 
-    public static int MaxCapacity
+    public static int Capacity
     {
         get { return 5; }
     }
