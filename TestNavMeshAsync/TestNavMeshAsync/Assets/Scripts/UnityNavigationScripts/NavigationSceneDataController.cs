@@ -20,6 +20,9 @@ public class NavigationSceneDataController : MonoBehaviour
 
 	public bool isReady;
 
+	private Vector3 pathStart;
+	private Vector3 pathEnd;
+
 	private IEnumerator Start()
 	{
 		yield return null;
@@ -70,7 +73,7 @@ public class NavigationSceneDataController : MonoBehaviour
 		for (int i = 0; i < playersCount; i++)
 		{
 			NavMeshQuery query = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.TempJob, 1000);
-			var queryStatus = players[i].GetNavigationQuerry(query, out int pathLength, out Vector3 start, out Vector3 finish);
+			var queryStatus = players[i].GetNavigationQuerry(query, out int pathLength, out pathStart, out pathEnd);
 			if (queryStatus != PathQueryStatus.Success)
 			{
 				//Debug.Log($"{gameObject.name}  {players[i].gameObject.name} FAILED {queryStatus}");
@@ -85,8 +88,6 @@ public class NavigationSceneDataController : MonoBehaviour
 					queryPathResult = new NativeArray<PolygonId>(1, Allocator.TempJob),
 					pathLength = 0,
 					maxPathLength = default,
-					straightPathFlags = new NativeArray<StraightPathFlags>(1, Allocator.TempJob),
-					vertexSide = new NativeArray<float>(1, Allocator.TempJob),
 					straightPath = new NativeArray<NavMeshLocation>(1, Allocator.TempJob),
 					straightPathLength = new NativeArray<int>(1, Allocator.TempJob),
 					status = new NativeArray<PathQueryStatus>(1, Allocator.TempJob)
@@ -104,13 +105,11 @@ public class NavigationSceneDataController : MonoBehaviour
 				{
 					characterID = players[i].id,
 					query = query,
-					startPos = start,
-					endPos = finish,
+					startPos = pathStart,
+					endPos = pathEnd,
 					queryPathResult = queryPathResult,
 					pathLength = pathLength,
 					maxPathLength = maxPathLength,
-					straightPathFlags = new NativeArray<StraightPathFlags>(pathLength, Allocator.TempJob),
-					vertexSide = new NativeArray<float>(pathLength, Allocator.TempJob),
 					straightPath = new NativeArray<NavMeshLocation>(pathLength, Allocator.TempJob),
 					straightPathLength = new NativeArray<int>(1, Allocator.TempJob),
 					status = new NativeArray<PathQueryStatus>(1, Allocator.TempJob)
@@ -138,8 +137,6 @@ public class NavigationSceneDataController : MonoBehaviour
 					queryPathResult = new NativeArray<PolygonId>(1, Allocator.TempJob),
 					pathLength = 0,
 					maxPathLength = default,
-					straightPathFlags = new NativeArray<StraightPathFlags>(1, Allocator.TempJob),
-					vertexSide = new NativeArray<float>(1, Allocator.TempJob),
 					straightPath = new NativeArray<NavMeshLocation>(1, Allocator.TempJob),
 					straightPathLength = new NativeArray<int>(1, Allocator.TempJob),
 					status = new NativeArray<PathQueryStatus>(1, Allocator.TempJob)
@@ -165,8 +162,6 @@ public class NavigationSceneDataController : MonoBehaviour
 						queryPathResult = new NativeArray<PolygonId>(1, Allocator.TempJob),
 						pathLength = 0,
 						maxPathLength = default,
-						straightPathFlags = new NativeArray<StraightPathFlags>(1, Allocator.TempJob),
-						vertexSide = new NativeArray<float>(1, Allocator.TempJob),
 						straightPath = new NativeArray<NavMeshLocation>(1, Allocator.TempJob),
 						straightPathLength = new NativeArray<int>(1, Allocator.TempJob),
 						status = new NativeArray<PathQueryStatus>(1, Allocator.TempJob)
@@ -224,14 +219,8 @@ public class NavigationSceneDataController : MonoBehaviour
 
 				queryDataChunks[i][j].query.Dispose();
 
-				if(queryDataChunks[i][j].straightPathFlags.IsCreated)
-					queryDataChunks[i][j].straightPathFlags.Dispose();
-				
 				if(queryDataChunks[i][j].queryPathResult.IsCreated)
 					queryDataChunks[i][j].queryPathResult.Dispose();
-
-				if(queryDataChunks[i][j].vertexSide.IsCreated)
-					queryDataChunks[i][j].vertexSide.Dispose();
 
 				if(queryDataChunks[i][j].straightPath.IsCreated)
 					queryDataChunks[i][j].straightPath.Dispose();

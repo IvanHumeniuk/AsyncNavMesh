@@ -19,7 +19,7 @@ namespace UnityNavigationResearch
         private float lastPathTime;
         public float findPathRate;
 
-        private Vector3 movementDirection;
+        private Vector3 displacement;
         public float speed = 2;
         public bool isReady;
 
@@ -29,6 +29,16 @@ namespace UnityNavigationResearch
         private NativeArray<PolygonId> result;
         private NativeArray<PathQueryStatus> jobStatus;
         private NativeArray<int> straightPathLength;
+       
+        private Vector3 targetPosition;
+
+        private int querryFindPatIterations = 1024;
+
+        private NavMeshLocation from;
+        private NavMeshLocation to;
+        private PathQueryStatus status = PathQueryStatus.Failure;
+        private Vector3 extends = Vector3.one;
+
 
         private void Awake()
         {
@@ -39,10 +49,13 @@ namespace UnityNavigationResearch
         void Start()
         {
             path = new Vector3[0];
-           /* query = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.Persistent, 1000);
-            result = new NativeArray<PolygonId>(100, Allocator.Persistent);
-            jobStatus = new NativeArray<PathQueryStatus>(1, Allocator.Persistent);
-            straightPathLength = new NativeArray<int>(1, Allocator.Persistent);*/
+            targetPosition = target.position;
+      
+            /* query = new NavMeshQuery(NavMeshWorld.GetDefaultWorld(), Allocator.Persistent, 1000);
+             result = new NativeArray<PolygonId>(100, Allocator.Persistent);
+             jobStatus = new NativeArray<PathQueryStatus>(1, Allocator.Persistent);
+             straightPathLength = new NativeArray<int>(1, Allocator.Persistent);*/
+
         }
 
         private void OnDestroy()
@@ -71,14 +84,15 @@ namespace UnityNavigationResearch
             frameCounter++;
 
             if (frameCounter % 3 == 0)
-                transform.position += movementDirection * speed * Time.fixedDeltaTime;
+                transform.position += displacement;
 
-            if (Time.time < lastPathTime + findPathRate)
-                return;
+            if (frameCounter % 50 == 0)
+                displacement = new Vector3(UnityEngine.Random.Range(-1f, 1f), 0, UnityEngine.Random.Range(-1f, 1f)) * speed * Time.fixedDeltaTime;
 
-            movementDirection = new Vector3(UnityEngine.Random.Range(-1f, 1f), 0, UnityEngine.Random.Range(-1f, 1f));
+            //    if (Time.time < lastPathTime + findPathRate)
+            //     return;
 
-            lastPathTime = Time.time;
+            //    lastPathTime = Time.time;
 
             //CalculatePath();
         }
@@ -114,18 +128,12 @@ namespace UnityNavigationResearch
 
             pathLength = 1;
             startPosition = transform.position;
-            finishPosition = target.position;
-
-            int querryFindPatIterations = 1024;
-
-            NavMeshLocation from;
-            NavMeshLocation to;
-            PathQueryStatus status = PathQueryStatus.Failure;
+            finishPosition = targetPosition;
 
             try
             {
-                from = navMeshQuery.MapLocation(startPosition, Vector3.one, 0);
-                to = navMeshQuery.MapLocation(finishPosition, Vector3.one, 0);
+                from = navMeshQuery.MapLocation(startPosition, extends, 0);
+                to = navMeshQuery.MapLocation(finishPosition, extends, 0);
 
                 status = navMeshQuery.BeginFindPath(from, to);
             }

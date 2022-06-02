@@ -12,9 +12,6 @@ public struct NavMeshQueryDataContainer
     [NativeDisableParallelForRestriction] public int pathLength;
     [NativeDisableParallelForRestriction] public int maxPathLength;
 
-    [NativeDisableParallelForRestriction] public NativeArray<StraightPathFlags> straightPathFlags;
-    [NativeDisableParallelForRestriction] public NativeArray<float> vertexSide;
-   
     // return
     [NativeDisableParallelForRestriction] public NativeArray<NavMeshLocation> straightPath;
     [NativeDisableParallelForRestriction] public NativeArray<int> straightPathLength;

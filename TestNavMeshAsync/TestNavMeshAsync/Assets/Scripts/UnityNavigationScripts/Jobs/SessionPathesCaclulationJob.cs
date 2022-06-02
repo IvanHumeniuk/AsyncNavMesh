@@ -49,33 +49,30 @@ public struct SessionPathesCaclulationJob : IJobParallelFor
 
 	public void Execute(int index)
 	{
-		//for (int index = 0; index < 4; index++)
+		switch (index)
 		{
-			switch (index)
-			{
-				case 0:
-					{
-						HandleChunkCalculation(chunk0);
-						break;
-					}
-				case 1:
-					{
-						HandleChunkCalculation(chunk1);
-						break;
-					}
-				case 2:
-					{
-						HandleChunkCalculation(chunk2);
-						break;
-					}
-				case 3:
-					{
-						HandleChunkCalculation(chunk3);
-						break;
-					}
-				default:
-					return;
-			}
+			case 0:
+				{
+					HandleChunkCalculation(chunk0);
+					break;
+				}
+			case 1:
+				{
+					HandleChunkCalculation(chunk1);
+					break;
+				}
+			case 2:
+				{
+					HandleChunkCalculation(chunk2);
+					break;
+				}
+			case 3:
+				{
+					HandleChunkCalculation(chunk3);
+					break;
+				}
+			default:
+				return;
 		}
 	}
 
@@ -89,20 +86,16 @@ public struct SessionPathesCaclulationJob : IJobParallelFor
 				continue;
 	
 			var characterStraightPath = chunk[i].straightPath;
-			var characterStraightPathFlags = chunk[i].straightPathFlags;
-			var characterVertexSide = chunk[i].vertexSide;
 
 			int characterPathLength = 0;
 
-			PathQueryStatus pathStatus = PathUtils.FindStraightPath(
+			PathQueryStatus pathStatus = PathUtils.FindStraightPathOptimazed(
 				chunk[i].query,
 				chunk[i].startPos,
 				chunk[i].endPos,
 				chunk[i].queryPathResult,
 				chunk[i].pathLength,
 				ref characterStraightPath,
-				ref characterStraightPathFlags,
-				ref characterVertexSide,
 				ref characterPathLength,
 				chunk[i].maxPathLength);
 
